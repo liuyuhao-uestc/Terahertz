@@ -1,0 +1,22 @@
+# python 缓存
+__pycache__/
+*.py[cod]
+
+# Mac 系统文件
+.DS_Store
+
+# Pytorch 模型权重 (防止传上去几个G的文件)
+*.pth
+*.pt
+*.ckpt
+
+# 数据集文件夹 (假设你的数据放在 data 目录下)
+data/
+datasets/
+
+# 训练日志
+logs/
+output/
+wandb/
+.idea/
+.vscode/

@@ -33,9 +33,8 @@ if __name__ == "__main__":
     data2.setup()
     train_dataloader2 = data2.train_dataloader()
     val_dataloader2 = data2.val_dataloader()
-    model = my_model().to('mps')
+    model = my_model().to('cuda')
     for batch1,batch2,batch3 in zip(train_dataloader,train_dataloader1,train_dataloader2):
-        with torch.autocast(device_type="mps", dtype=torch.bfloat16):
+        with torch.autocast(device_type="cuda", dtype=torch.bfloat16):
             x1, x2, x3 = model([batch1,batch2,batch3])
-
         break

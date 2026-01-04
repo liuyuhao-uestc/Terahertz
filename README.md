@@ -3,7 +3,7 @@ dataset 2 ——> batch 2 ——> vae ——> latent\
 dataset 3 ——> batch 3 ——> vae ——> latent\
 
 $$
-x_1,x_2,x_3\xrightarrow{交织+功率归一化} x:[B,num,size] \xrightarrow{信道:awgn+丢包} y \xrightarrow{反交织}
+x_1,x_2,x_3\xrightarrow{交织} x:[B,包数目,包大小] \xrightarrow{信道:awgn+丢包} y(窄，中，q宽) \xrightarrow{反交织}
 \begin{cases}
 \hat{x}_{1窄},\hat{x}_{1中},\hat{x}_{1宽} \xrightarrow{attention解} \hat{x}_1 \xrightarrow{error\ \ detect} \\
 \hat{x}_{2窄},\hat{x}_{2中},\hat{x}_{2宽} \xrightarrow{attention解} \hat{x}_2 \xrightarrow{error\ \ detect} \\

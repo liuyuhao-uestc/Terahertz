@@ -17,9 +17,11 @@ class Channel(nn.Module):
 
     ### 随机丢包
     def loss_packet(self,x):
-        B, num_packet, packet_size = x.size()
-        mask = (torch.rand(B, num_packet, device=x.device) > self.plr).float().view(B, num_packet, 1)
-        return x * mask
+        # B, num_packet, packet_size = x.size()
+        # mask = (torch.rand(B, num_packet, device=x.device) > self.plr).float().view(B, num_packet, 1)
+        mask = torch.randn_like(x) < self.plr
+        x[mask] = 1e-9
+        return x
 
     def forward(self,x):
         x_noise = self.awgn_channel(x)

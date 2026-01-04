@@ -22,23 +22,13 @@ class my_model(nn.Module):
         self.d_model = d_model
         self.n_heads = n_heads
 
-        self.interleaver = Interleaver()
-
         self.channel_1 = Channel(snr=35 , plr=0.35)
         self.channel_2 = Channel(snr=15 , plr=0.08)
         self.channel_3 = Channel(snr=5 , plr=0.01)
 
-        self.norm1_wide = nn.LayerNorm(d_model)
-        self.norm1_mid = nn.LayerNorm(d_model)
-        self.norm1_narrow = nn.LayerNorm(d_model)
-
-        self.norm2_wide = nn.LayerNorm(d_model)
-        self.norm2_mid = nn.LayerNorm(d_model)
-        self.norm2_narrow = nn.LayerNorm(d_model)
-
-        self.norm3_wide = nn.LayerNorm(d_model)
-        self.norm3_mid = nn.LayerNorm(d_model)
-        self.norm3_narrow = nn.LayerNorm(d_model)
+        self.norm_wide = nn.LayerNorm(d_model)
+        self.norm_mid = nn.LayerNorm(d_model)
+        self.norm_narrow = nn.LayerNorm(d_model)
 
         self.norm2_1 = nn.LayerNorm(d_model)
         self.norm2_2 = nn.LayerNorm(d_model)
@@ -121,58 +111,29 @@ class my_model(nn.Module):
 
     def forward(self, batch):
         # 获得latent：
-        batch_1 = batch[0]
-        out_vq = self.ldm.get_input(batch_1,self.ldm.first_stage_key)
-        z1,c = out_vq
-
-        batch_2 = batch[1]
-        out_vq = self.ldm.get_input(batch_2, self.ldm.first_stage_key)
-        z2, c = out_vq
-
-        batch_3 = batch[2]
-        out_vq = self.ldm.get_input(batch_3, self.ldm.first_stage_key)
-        z3, c = out_vq
-
-        # 交织：
-        x = self.interleaver.interleave([z1,z2,z3])
-        print("latent：",z1.shape,z2.shape,z3.shape)
-        print("交织：",x.shape)
+        out_vq = self.ldm.get_input(batch,self.ldm.first_stage_key)
+        z = out_vq
 
         # 信道：噪声 + 丢包
-        y_wide = self.channel_1(x)
-        y_mid = self.channel_2(x)
-        y_narrow = self.channel_3(x)
+        y_wide = self.channel_1(z)
+        y_mid = self.channel_2(z)
+        y_narrow = self.channel_3(z)
 
-        # 解交织
-        x1_wide, x2_wide, x3_wide = self.interleaver.deinterleave(y_wide)
-        x1_mid, x2_mid, x3_mid = self.interleaver.deinterleave(y_mid)
-        x1_narrow, x2_narrow, x3_narrow = self.interleaver.deinterleave(y_narrow)
-        print("解交织：", x1_wide.shape, x2_wide.shape, x3_wide.shape)
-
-        x1_wide, x2_wide, x3_wide = self.linear_map(x1_wide),self.linear_map(x2_wide),self.linear_map(x3_wide)
-        x1_mid, x2_mid, x3_mid = self.linear_map(x1_mid), self.linear_map(x2_mid), self.linear_map(x3_mid)
-        x1_narrow, x2_narrow, x3_narrow = self.linear_map(x1_narrow), self.linear_map(x2_narrow), self.linear_map(x3_narrow)
-        print("linear map：",x1_wide.shape, x2_wide.shape, x3_wide.shape)
+        x_wide = self.linear_map(y_wide)
+        x_mid = self.linear_map(y_mid)
+        x_narrow = self.linear_map(y_narrow)
+        print("linear map：",x_wide.shape)
 
         # 位置编码
-        x1_wide, x2_wide, x3_wide =[i + self.positional_encoding.pe[:, :] for i in [x1_wide, x2_wide, x3_wide]]
-        x1_mid, x2_mid, x3_mid = [i + self.positional_encoding.pe[:, :] for i in [x1_mid, x2_mid, x3_mid]]
-        x1_narrow, x2_narrow, x3_narrow = [i + self.positional_encoding.pe[:, :] for i in [x1_narrow, x2_narrow, x3_narrow]]
+        x_wide = x_wide + self.positional_encoding.pe[:, :]
+        x_mid = x_mid + self.positional_encoding.pe[:, :]
+        x_narrow = x_narrow + self.positional_encoding.pe[:, :]
         print("位置编码：done")
 
         # Pre-LN
-        x1_wide_norm = self.norm1_wide(x1_wide)
-
-        x1_mid_norm = self.norm1_mid(x1_mid)
-        x1_narrow_norm = self.norm1_narrow(x1_narrow)
-
-        x2_wide_norm = self.norm2_wide(x2_wide)
-        x2_mid_norm = self.norm2_mid(x2_mid)
-        x2_narrow_norm = self.norm2_narrow(x2_narrow)
-
-        x3_wide_norm = self.norm3_wide(x3_wide)
-        x3_mid_norm = self.norm3_mid(x3_mid)
-        x3_narrow_norm = self.norm3_narrow(x3_narrow)
+        x_wide_norm = self.norm_wide(x_wide)
+        x_mid_norm = self.norm_mid(x_mid)
+        x_narrow_norm = self.norm_narrow(x_narrow)
 
         # 恢复
         # 单发
@@ -187,9 +148,6 @@ class my_model(nn.Module):
         '''
         #三发
         print("正在recon中")
-        x1_hat_trip = self.recon_3(x1_wide, x1_wide_norm, x1_mid_norm, x1_narrow_norm).view(48,3,64,64)
-        x2_hat_trip = self.recon_3(x2_wide, x2_wide_norm, x2_mid_norm, x2_narrow_norm).view(48,3,64,64)
-        x3_hat_trip = self.recon_3(x3_wide, x3_wide_norm, x3_mid_norm, x3_narrow_norm).view(48,3,64,64)
+        x_hat_trip = self.recon_3(x_wide, x_wide_norm, x_mid_norm, x_narrow_norm).view(48,3,64,64) #
 
-
-        return x1_hat_trip, x2_hat_trip, x3_hat_trip
+        return x_hat_trip

@@ -11,7 +11,7 @@ __pycache__/
 *.ckpt
 
 # 数据集文件夹 (假设你的数据放在 data 目录下)
-data/
+celeba_hq_npy
 datasets/
 
 # 训练日志

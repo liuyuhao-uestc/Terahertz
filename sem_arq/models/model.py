@@ -22,9 +22,9 @@ class my_model(nn.Module):
         self.d_model = d_model
         self.n_heads = n_heads
 
-        self.channel_1 = Channel(snr=35 , plr=0.35)
-        self.channel_2 = Channel(snr=15 , plr=0.08)
-        self.channel_3 = Channel(snr=5 , plr=0.01)
+        self.channel_1 = Channel(snr_db=35 , plr=0.35)
+        self.channel_2 = Channel(snr_db=15 , plr=0.08)
+        self.channel_3 = Channel(snr_db=5 , plr=0.01)
 
         self.norm_wide = nn.LayerNorm(d_model)
         self.norm_mid = nn.LayerNorm(d_model)
@@ -111,7 +111,7 @@ class my_model(nn.Module):
 
     def forward(self, batch):
         # 获得latent：
-        out_vq = self.ldm.get_input(batch,self.ldm.first_stage_key)
+        out_vq,_ = self.ldm.get_input(batch,self.ldm.first_stage_key)
         z = out_vq
 
         # 信道：噪声 + 丢包

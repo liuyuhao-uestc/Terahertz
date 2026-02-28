@@ -9,7 +9,7 @@ __pycache__/
 *.pth
 *.pt
 *.ckpt
-
+*.zip
 # 数据集文件夹 (假设你的数据放在 data 目录下)
 celeba_hq_npy
 datasets/

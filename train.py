@@ -2,6 +2,11 @@ from sem_arq.utils.instantiate import instantiate_from_config,load_model
 from omegaconf import OmegaConf
 from sem_arq.models.model import my_model
 import torch
+import numpy as np
+import matplotlib.pyplot as plt
+from taming.data.base import NumpyPaths
+import os
+from torch.utils.data import DataLoader
 '''
 每个batch:
 ==============================
@@ -14,27 +19,79 @@ Key: 'file_path_' | Value: ['data/celeba_hq_npy/imgHQ19337.npy', 'data/celeba_hq
 
 
 if __name__ == "__main__":
+    # 加载数据集
     config = OmegaConf.load('models/ldm/celeba/config.yaml')
-
     data = instantiate_from_config(config.data)
     data.prepare_data()
     data.setup()
     train_dataloader = data.train_dataloader()
     val_dataloader = data.val_dataloader()
 
-    data1 = instantiate_from_config(config.data1)
-    data1.prepare_data()
-    data1.setup()
-    train_dataloader1 = data1.train_dataloader()
-    val_dataloader1 = data1.val_dataloader()
+    config_ldm = 'models/ldm/celeba/config.yaml'
+    ckpt_ldm = 'models/ldm/celeba/model.ckpt'
+    config_ldm = OmegaConf.load(config_ldm)
+    ldm, ldm_gl = load_model(config_ldm, ckpt_ldm, 0, 0)
+    ldm = ldm.eval()
+    for p in ldm.parameters():
+        p.requires_grad = False
 
-    data2 = instantiate_from_config(config.data2)
-    data2.prepare_data()
-    data2.setup()
-    train_dataloader2 = data2.train_dataloader()
-    val_dataloader2 = data2.val_dataloader()
-    model = my_model().to('cuda')
-    for batch1,batch2,batch3 in zip(train_dataloader,train_dataloader1,train_dataloader2):
-        with torch.autocast(device_type="cuda", dtype=torch.bfloat16):
-            x1, x2, x3 = model([batch1,batch2,batch3])
+    for batch in train_dataloader:
+        with torch.autocast(device_type="mps", dtype=torch.float16):
+
+            ### VAE编码可视化 ###
+            img1 = batch['image'][0]
+            img1 = img1.detach().cpu().numpy()
+            fig, axes = plt.subplots(1, 7, figsize=(16, 4))
+            axes[0].imshow(img1)
+            axes[0].set_title("Original Image")
+            axes[0].axis("off")
+            out,_ =ldm.get_input(batch, ldm.first_stage_key)
+
+            t = torch.randint(0, ldm.num_timesteps, (out.shape[0],), device=ldm.device).long()  # 加噪时间步,batch内相同，[batch]
+            print("时间步t：",t[0])
+            # print("时间步t形状：",t.shape)  torch.Size([batch])
+            z_noise = ldm.q_sample(out, t)  # 加噪过程
+            # print("z_noise形状：",z_noise.shape)  torch.Size([batch, 3, 64, 64])
+
+            print(out.shape)
+            latent1 = out[0]
+            latent1 = latent1.detach().cpu().numpy()
+            for i in range(3):
+                axes[i + 1].imshow(latent1[i], cmap="gray")
+                axes[i + 1].set_title(f"Latent Channel {i}")
+                axes[i + 1].axis("off")
+            '''
+            img_noi = z_noise[0]
+            img_noi = img_noi.detach().cpu().numpy()
+            for i in range(3):
+                axes[i + 4].imshow(img_noi[i], cmap="gray")
+                axes[i + 4].set_title(f"noisy Channel {i}")
+                axes[i + 4].axis("off")
+            '''
+            print("去噪中")
+            z_final, _ = ldm.progressive_denoising(
+                cond=None,
+                shape=out.shape,
+                x_T=z_noise,
+                start_T=t[0] + 1,  # 因为会从 t_val 一直迭代到 0
+                verbose=False
+            )
+            print("解码中")
+            img_final = ldm.decode_first_stage(z_final)
+            img_rec = img_final[0]
+            img_rec = img_rec.detach().cpu().numpy()
+            for i in range(3):
+                axes[i + 4].imshow(img_rec[i], cmap="gray")
+                axes[i + 4].set_title(f"noisy Channel {i}")
+                axes[i + 4].axis("off")
+
+            plt.suptitle("Image vs Latent Channels")
+            plt.tight_layout()
+            plt.show()
+            # 假设 z 是你的 latent batch
+            print(f"Mean: {out.mean().item():.4f}")
+            print(f"Std:  {out.std().item():.4f}")
+            print(f"Mean: {z_noise.mean().item():.4f}")
+            print(f"Std:  {z_noise.std().item():.4f}")
+
         break

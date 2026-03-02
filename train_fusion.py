@@ -58,7 +58,7 @@ def save_ckpt(path, model):
 
 if __name__ == "__main__":
     num_epochs = 10
-    device = "mps"
+    device = "cuda"
     model_fusion = FusionNet().to(device)
 
     # 加载数据集
